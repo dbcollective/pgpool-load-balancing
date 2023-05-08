@@ -1,0 +1,57 @@
+version: '3.8'
+services:
+  pg-master:
+    container_name: pg-master
+    image: bitnami/postgresql:15
+    ports:
+      - 5432
+    volumes:
+      - ./master_data:/bitnami/postgresql
+      - ./conf:/opt/bitnami/postgresql/conf/conf.d
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+      POSTGRESQL_REPLICATION_USER: ${DB_USER}
+      POSTGRESQL_REPLICATION_PASSWORD: ${DB_PASSWORD}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE}
+    env_file:
+      - ./.env
+  pg-standby:
+    container_name: pg-standby
+    image: bitnami/postgresql:15
+    ports:
+      - 5432
+    depends_on:
+      - pg-master
+    volumes:
+      - ./standby_data:/bitnami/postgresql
+      - ./conf:/opt/bitnami/postgresql/conf/conf.d
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_REPLICATION_USER: ${DB_USER}
+      POSTGRESQL_REPLICATION_PASSWORD: ${DB_PASSWORD}
+      POSTGRESQL_MASTER_HOST: pg-master
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD}
+    env_file:
+      - ./.env
+  pgpool:
+    container_name: pgpool
+    image: bitnami/pgpool:4.4.2
+    ports:
+      - ${PGPOOL_HOST_PORT:-5432}:5432
+    depends_on:
+      - pg-master
+    environment:
+      PGPOOL_BACKEND_NODES: 0:pg-master:5432:4:primary:ALWAYS_PRIMARY,1:pg-standby:5432:6:replica
+      PGPOOL_POSTGRES_USERNAME: ${DB_USER}
+      PGPOOL_POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGPOOL_ADMIN_USERNAME: ${ADMIN_USERNAME}
+      PGPOOL_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PGPOOL_ENABLE_LOAD_BALANCING: ${ENABLE_LOAD_BALANCING}
+      PGPOOL_ENABLE_STATEMENT_LOAD_BALANCING: ${ENABLE_STATEMENT_LOAD_BALANCING}
+      PGPOOL_NUM_INIT_CHILDREN: ${NUM_INIT_CHILDREN}
+      PGPOOL_MAX_POOL: ${MAX_POOL}
+      PGPOOL_SR_CHECK_USER: ${SR_CHECK_USER}
+      PGPOOL_SR_CHECK_PASSWORD: ${SR_CHECK_PASSWORD}
+    env_file:
+      - ./.env
